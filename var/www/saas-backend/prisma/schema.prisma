@@ -1,0 +1,272 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "mysql"
+}
+
+model customers {
+  id            BigInt    @id @default(autoincrement())
+  name          String    @db.VarChar(100)
+  company_name  String?   @db.VarChar(100)
+  phone         String?   @db.VarChar(20)
+  email         String?   @db.VarChar(100)
+  status        String    @default("potential") @db.VarChar(20)
+  remark        String?   @db.Text
+  owner_user_id BigInt?
+  created_at    DateTime? @default(now()) @db.DateTime(0)
+  updated_at    DateTime? @default(now()) @db.DateTime(0)
+  users         users?    @relation(fields: [owner_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_customer_owner")
+  orders        orders[]
+  customer_follow_ups customer_follow_ups[]
+  contracts     contracts[]
+  payments      payments[]
+
+  @@index([owner_user_id], map: "fk_customer_owner")
+}
+
+model operation_logs {
+  id         BigInt    @id @default(autoincrement())
+  user_id    BigInt
+  module     String    @db.VarChar(50)
+  action     String    @db.VarChar(50)
+  target_id  BigInt?
+  detail     String?   @db.Text
+  created_at DateTime? @default(now()) @db.DateTime(0)
+  users      users     @relation(fields: [user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_operation_log_user")
+
+  @@index([user_id], map: "fk_operation_log_user")
+}
+
+model orders {
+  id          BigInt    @id @default(autoincrement())
+  order_no    String    @unique(map: "order_no") @db.VarChar(50)
+  customer_id BigInt
+  amount      Decimal   @default(0.00) @db.Decimal(10, 2)
+  status      String    @default("pending") @db.VarChar(20)
+  description String?   @db.Text
+  created_by  BigInt
+  created_at  DateTime? @default(now()) @db.DateTime(0)
+  updated_at  DateTime? @default(now()) @db.DateTime(0)
+  users       users     @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_order_creator")
+  customers   customers @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_order_customer")
+  contracts   contracts[]
+  payments    payments[]
+
+  @@index([created_by], map: "fk_order_creator")
+  @@index([customer_id], map: "fk_order_customer")
+}
+
+model permissions {
+  id                      BigInt                    @id @default(autoincrement())
+  name                    String                    @db.VarChar(100)
+  code                    String                    @unique(map: "code") @db.VarChar(100)
+  module                  String                    @db.VarChar(50)
+  created_at              DateTime?                 @default(now()) @db.DateTime(0)
+  role_permissions        role_permissions[]
+  permission_preset_items permission_preset_items[]
+}
+
+
+model permission_preset_items {
+  id                  BigInt              @id @default(autoincrement())
+  preset_id           BigInt
+  permission_id       BigInt
+  created_at          DateTime?           @default(now()) @db.DateTime(0)
+  permission_presets  permission_presets  @relation(fields: [preset_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_permission_preset_item_preset")
+  permissions         permissions         @relation(fields: [permission_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_permission_preset_item_permission")
+
+  @@unique([preset_id, permission_id], map: "uk_permission_preset_item")
+  @@index([permission_id], map: "idx_permission_preset_item_permission")
+}
+
+model permission_presets {
+  id                      BigInt                    @id @default(autoincrement())
+  name                    String                    @unique(map: "uk_permission_preset_name") @db.VarChar(100)
+  code                    String                    @unique(map: "uk_permission_preset_code") @db.VarChar(100)
+  description             String?                   @db.VarChar(255)
+  created_by              BigInt?
+  created_at              DateTime?                 @default(now()) @db.DateTime(0)
+  updated_at              DateTime?                 @default(now()) @db.DateTime(0)
+  permission_preset_items permission_preset_items[]
+
+  @@index([created_by], map: "idx_permission_preset_created_by")
+}
+
+model role_permissions {
+  id            BigInt      @id @default(autoincrement())
+  role_id       BigInt
+  permission_id BigInt
+  permissions   permissions @relation(fields: [permission_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_role_permission_permission")
+  roles         roles       @relation(fields: [role_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_role_permission_role")
+
+  @@unique([role_id, permission_id], map: "uk_role_permission")
+  @@index([permission_id], map: "fk_role_permission_permission")
+}
+
+model roles {
+  id               BigInt             @id @default(autoincrement())
+  name             String             @db.VarChar(50)
+  code             String             @unique(map: "code") @db.VarChar(50)
+  description      String?            @db.VarChar(255)
+  created_at       DateTime?          @default(now()) @db.DateTime(0)
+  updated_at       DateTime?          @default(now()) @db.DateTime(0)
+  role_permissions role_permissions[]
+  user_invites     user_invites[]
+  users            users[]
+}
+
+model users {
+  id                    BigInt                  @id @default(autoincrement())
+  username              String                  @unique(map: "username") @db.VarChar(50)
+  email                 String                  @unique(map: "email") @db.VarChar(100)
+  phone                 String?                 @db.VarChar(20)
+  department            String?                 @db.VarChar(100)
+  position              String?                 @db.VarChar(100)
+  password_hash         String                  @db.VarChar(255)
+  role_id               BigInt
+  status                String                  @default("active") @db.VarChar(20)
+  last_login_at         DateTime?               @db.DateTime(0)
+  password_updated_at   DateTime?               @db.DateTime(0)
+  is_temp_password      Boolean                 @default(false)
+  created_at            DateTime?               @default(now()) @db.DateTime(0)
+  updated_at            DateTime?               @default(now()) @db.DateTime(0)
+  customers             customers[]
+  customer_follow_ups   customer_follow_ups[]
+  contracts_as_owner    contracts[]             @relation("contract_owner")
+  contracts_as_creator  contracts[]             @relation("contract_creator")
+  notifications_received notifications[]        @relation("notification_recipient")
+  notifications_sent     notifications[]        @relation("notification_sender")
+  operation_logs        operation_logs[]
+  orders                orders[]
+  payments              payments[]
+  password_reset_tokens password_reset_tokens[]
+  user_invites_as_owner user_invites[]          @relation("invite_operator")
+  roles                 roles                   @relation(fields: [role_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_role")
+
+  @@index([role_id], map: "fk_user_role")
+}
+
+model notifications {
+  id                BigInt    @id @default(autoincrement())
+  type              String    @db.VarChar(30)
+  title             String    @db.VarChar(200)
+  content           String    @db.Text
+  level             String    @default("info") @db.VarChar(20)
+  recipient_user_id BigInt
+  sender_user_id    BigInt?
+  business_type     String?   @db.VarChar(50)
+  business_id       BigInt?
+  is_read           Boolean   @default(false)
+  read_at           DateTime? @db.DateTime(0)
+  created_at        DateTime? @default(now()) @db.DateTime(0)
+  recipient_user    users     @relation("notification_recipient", fields: [recipient_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_notification_recipient")
+  sender_user       users?    @relation("notification_sender", fields: [sender_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_notification_sender")
+
+  @@index([recipient_user_id], map: "fk_notification_recipient")
+  @@index([sender_user_id], map: "fk_notification_sender")
+  @@index([is_read], map: "idx_notifications_is_read")
+  @@index([type], map: "idx_notifications_type")
+  @@index([created_at], map: "idx_notifications_created_at")
+}
+
+model customer_follow_ups {
+  id                BigInt    @id @default(autoincrement())
+  customer_id       BigInt
+  follow_up_type    String    @db.VarChar(50)
+  content           String?   @db.Text
+  result            String?   @db.Text
+  next_follow_up_at DateTime? @db.DateTime(0)
+  created_by        BigInt
+  created_at        DateTime? @default(now()) @db.DateTime(0)
+  updated_at        DateTime? @default(now()) @db.DateTime(0)
+  customers         customers @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_customer_follow_up_customer")
+  users             users     @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_customer_follow_up_creator")
+
+  @@index([customer_id], map: "fk_customer_follow_up_customer")
+  @@index([created_by], map: "fk_customer_follow_up_creator")
+}
+
+model contracts {
+  id         BigInt    @id @default(autoincrement())
+  contract_no String   @unique(map: "contract_no") @db.VarChar(50)
+  customer_id BigInt
+  order_id    BigInt?
+  title       String?  @db.VarChar(200)
+  amount      Decimal  @default(0.00) @db.Decimal(12, 2)
+  status      String   @default("draft") @db.VarChar(20)
+  sign_date   DateTime? @db.Date
+  start_date  DateTime? @db.Date
+  end_date    DateTime? @db.Date
+  owner_user_id BigInt?
+  created_by  BigInt
+  remark      String?  @db.Text
+  created_at  DateTime? @default(now()) @db.DateTime(0)
+  updated_at  DateTime? @default(now()) @db.DateTime(0)
+  customers   customers @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_contract_customer")
+  orders      orders?   @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_contract_order")
+  owner_user  users?    @relation("contract_owner", fields: [owner_user_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_contract_owner")
+  creator_user users    @relation("contract_creator", fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_contract_creator")
+  payments    payments[]
+
+  @@index([customer_id], map: "fk_contract_customer")
+  @@index([order_id], map: "fk_contract_order")
+  @@index([owner_user_id], map: "fk_contract_owner")
+  @@index([created_by], map: "fk_contract_creator")
+}
+
+model payments {
+  id            BigInt    @id @default(autoincrement())
+  contract_id   BigInt
+  order_id      BigInt?
+  customer_id   BigInt
+  amount        Decimal   @db.Decimal(12, 2)
+  payment_date  DateTime? @db.Date
+  payment_method String?  @db.VarChar(50)
+  status        String?   @default("pending") @db.VarChar(20)
+  remark        String?   @db.Text
+  created_by    BigInt
+  created_at    DateTime? @default(now()) @db.DateTime(0)
+  updated_at    DateTime? @default(now()) @db.DateTime(0)
+  contracts     contracts @relation(fields: [contract_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_payment_contract")
+  orders        orders?   @relation(fields: [order_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_payment_order")
+  customers     customers @relation(fields: [customer_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_payment_customer")
+  users         users     @relation(fields: [created_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_payment_creator")
+
+  @@index([contract_id], map: "fk_payment_contract")
+  @@index([order_id], map: "fk_payment_order")
+  @@index([customer_id], map: "fk_payment_customer")
+  @@index([created_by], map: "fk_payment_creator")
+}
+
+model user_invites {
+  id         BigInt    @id @default(autoincrement())
+  email      String    @db.VarChar(100)
+  role_id    BigInt
+  invited_by BigInt
+  token      String    @unique(map: "uk_user_invites_token") @db.VarChar(128)
+  status     String    @default("pending") @db.VarChar(20)
+  expires_at DateTime  @db.DateTime(0)
+  accepted_at DateTime? @db.DateTime(0)
+  created_at DateTime? @default(now()) @db.DateTime(0)
+  roles      roles     @relation(fields: [role_id], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_invites_role")
+  users      users     @relation("invite_operator", fields: [invited_by], references: [id], onDelete: NoAction, onUpdate: NoAction, map: "fk_user_invites_invited_by")
+
+  @@index([email], map: "idx_user_invites_email")
+  @@index([role_id], map: "fk_user_invites_role")
+  @@index([invited_by], map: "fk_user_invites_invited_by")
+}
+
+model password_reset_tokens {
+  id         BigInt    @id @default(autoincrement())
+  user_id    BigInt
+  token      String    @unique(map: "uk_password_reset_tokens_token") @db.VarChar(128)
+  expires_at DateTime  @db.DateTime(0)
+  used_at    DateTime? @db.DateTime(0)
+  created_at DateTime? @default(now()) @db.DateTime(0)
+  users      users     @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: NoAction, map: "fk_password_reset_tokens_user")
+
+  @@index([user_id], map: "fk_password_reset_tokens_user")
+}
